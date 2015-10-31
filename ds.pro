@@ -47,3 +47,6 @@ FORMS    += mainwindow.ui \
     pringkvitok.ui \
     printtabel.ui \
     teacherspayment.ui
+
+DISTFILES += \
+    sqlite.sql
