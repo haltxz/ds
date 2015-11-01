@@ -28,10 +28,10 @@ MainWindow::MainWindow(QWidget *parent) :
    /* widgetname = "about";
     about = new About();
     ui->vlwidget->addWidget(about);*/
-    widgetname = "add_acc";
-    ac = new AddAccount();
-    ac->SetDb(&myDB);
-    ui->vlwidget->addWidget(ac);
+    widgetname = "TeachersPayment";
+    tp = new TeachersPayment();
+    tp->SetDb(&myDB);
+    ui->vlwidget->addWidget(tp);
 
 }
 
