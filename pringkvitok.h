@@ -19,7 +19,7 @@ public:
     ~PringKvitok();
     void SetDb(db *mdb);
     QString prepareKvit(QString child_id);
-
+    QString TwoKvitOnePage(QString page1, QString page2);
 private slots:
     void on_toolButton_select_clicked();
     void on_childs_toggled(bool checked);

@@ -56,7 +56,7 @@ void TeachersPayment::fillData()
     sql += " LEFT OUTER  JOIN teachers  t2 ON t0.teacher_id = t2.id ";
     sql += " WHERE date ='"+ date +"'";
     sql += " GROUP BY  t0.teacher_id, t0.child_id, t0.classes_id";
-
+    float allnachisleno = 0;
     QSqlQueryModel *wm = myDB->Query(sql);
     for(int i = 0; i < wm->rowCount(); i++){
           ui->tW->insertRow(ui->tW->rowCount());
@@ -64,6 +64,7 @@ void TeachersPayment::fillData()
           int child_id = wm->record(i).value("child_id").toInt();
           float sum = wm->record(i).value("sum").toFloat();
           float nachisleno = wm->record(i).value("percent").toFloat() / 100 * sum;
+          allnachisleno += nachisleno;
           treewm.insert(child_id, row_id);
           QString mapkey = wm->record(i).value("teacher_id").toString() +
                   "-" + wm->record(i).value("classes_id").toString() +
@@ -96,10 +97,12 @@ void TeachersPayment::fillData()
     }
 
     //всего получено оплат
+    float allpay = 0;
     QSqlQueryModel *ca = myDB->Query("SELECT child_id, sum(sum) AS sum FROM pay WHERE date <'" + date +"' OR  date ='" + date +"' GROUP BY child_id");
     for(int z = 0; z < ca->rowCount(); z++){
         int child_id = ca->record(z).value("child_id").toInt();
         childs_pay[child_id] = ca->record(z).value("sum").toFloat();
+        allpay += ca->record(z).value("sum").toFloat();
     }
 
     //всего начисленно на ребенка
@@ -107,6 +110,7 @@ void TeachersPayment::fillData()
     for(int z = 0; z < cp->rowCount(); z++){
         int child_id = cp->record(z).value("child_id").toInt();
         childs_pay[child_id] -= cp->record(z).value("sum").toFloat();
+        allpay -= cp->record(z).value("sum").toFloat();
     }
 
     for(int z = 0; z < cp->rowCount(); z++){
@@ -132,6 +136,16 @@ void TeachersPayment::fillData()
             ui->tW->setItem(values.at(i), 11,new QTableWidgetItem(QString::number(balans)));
         }
     }
+
+    sql = "SELECT  t2.fio, t1.name, t0.teacher_id, t0.classes_id, sum(t0.sum) AS sum , sum(t0.pay) AS pay FROM payment t0";
+    sql += " LEFT OUTER  JOIN classes  t1 ON t0.classes_id = t1.id";
+    sql += " LEFT OUTER  JOIN teachers  t2 ON t0.teacher_id = t2.id ";
+    sql += " WHERE t0.date = '"+ date +"' OR sum < pay GROUP BY t0.teacher_id, t0.classes_id";
+
+    ui->tableView->setModel( myDB->Query(sql) );
+    ui->tableView->resizeColumnsToContents();
+    ui->label_pay->setText(QString::number(allpay));
+    ui->label_fot->setText(QString::number(allnachisleno));
     delete wm;
     delete cp;
 }
@@ -146,12 +160,14 @@ void TeachersPayment::on_toolButton_save_clicked()
 
     myDB->Query("DELETE FROM payment WHERE date = '" + ui->dateEdit->text() + "'");
     for(int i = 0; i < ui->tW->rowCount(); i++){
+            float sum =  ui->tW->item(i, 5)->text().toFloat();
+            float dolg =  ui->tW->item(i, 6)->text().toFloat();
             QString sql = "INSERT INTO payment(teacher_id, classes_id, child_id, date, sum, pay) VALUES(";
             sql += ui->tW->item(i, 7)->text() + ", ";
             sql += ui->tW->item(i, 8)->text() + ", ";
             sql += ui->tW->item(i, 9)->text() + ", ";
             sql += "'" + ui->dateEdit->text() + "', ";
-            sql += ui->tW->item(i, 5)->text() + ", ";
+            sql +=  QString::number(sum + dolg) + ", ";
             sql += ui->tW->item(i, 10)->text();
             sql += ")";
            myDB->Query(sql);

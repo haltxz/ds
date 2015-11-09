@@ -65,7 +65,15 @@ FreezeTableWidget::FreezeTableWidget(QAbstractItemModel * model)
 
 FreezeTableWidget::~FreezeTableWidget()
 {
-      delete frozenTableView;
+    delete frozenTableView;
+}
+
+void FreezeTableWidget::setSpanF(int row, int column, int rowSpan, int columnSpan)
+{
+    setSpan(row, column, rowSpan, columnSpan);
+
+    frozenTableView->setSpan(row, column, rowSpan, columnSpan);
+
 }
 
 void FreezeTableWidget::init()
@@ -76,7 +84,7 @@ void FreezeTableWidget::init()
       frozenTableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
       frozenTableView->resizeColumnsToContents();
       frozenTableView->setAutoScroll(false);
-
+      frozenTableView->setAlternatingRowColors(true);
       viewport()->stackUnder(frozenTableView);
 
       frozenTableView->setStyleSheet("QTableView { border: none;"

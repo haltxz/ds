@@ -25,13 +25,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     downAll();
-   /* widgetname = "about";
+    widgetname = "about";
     about = new About();
-    ui->vlwidget->addWidget(about);*/
-    widgetname = "TeachersPayment";
+    ui->vlwidget->addWidget(about);
+   /* widgetname = "TeachersPayment";
     tp = new TeachersPayment();
     tp->SetDb(&myDB);
-    ui->vlwidget->addWidget(tp);
+    ui->vlwidget->addWidget(tp);*/
 
 }
 

@@ -12,6 +12,7 @@
 #include <QStandardItemModel>
 #include <QScrollBar>
 #include <QHeaderView>
+#include <QMenu>
 #include "freezetablewidget.h"
 
 
@@ -21,7 +22,6 @@ AddAccount::AddAccount(QWidget *parent) :
     ui(new Ui::AddAccount)
 {
     ui->setupUi(this);
-   // filled = false;
 
     ui->dateEdit->setDate(QDate::currentDate());
     model = new QStandardItemModel();
@@ -45,12 +45,21 @@ AddAccount::AddAccount(QWidget *parent) :
     ui->tW_aped->setColumnWidth(0, 20);
     ui->tW_aped->setColumnHidden(2, true);
 
+    m_pmnu = new QMenu();
+     m_pmnu->addAction("Ведомость");
+     m_pmnu->addAction("Расшифровка");
+     connect(m_pmnu, SIGNAL(triggered(QAction*)),  SLOT(on_PrintMenu(QAction*))    );
+     ui->toolButton_print->setMenu(m_pmnu);
+     ui->toolButton->setMenu(m_pmnu);
 
 
 }
 
 AddAccount::~AddAccount()
 {
+    delete tW;
+    delete model;
+    delete m_pmnu;
     delete ui;
 }
 
@@ -93,8 +102,21 @@ void AddAccount::SetDb(db *mdb)
     tW->setColumnWidth(1, tW->columnWidth(1) + 10);
     tW->setColumnWidth(2, tW->columnWidth(2) + 50);
     tW->horizontalHeader()->setStretchLastSection(true);
+    tW->setAlternatingRowColors(true);
+
+
+
     ui->verticalLayout_tw->addWidget(tW);
 
+//    QBrush yellow;
+//    yellow.setColor(Qt::red);
+//    QModelIndex index = model->index(4, 4);
+//    tW->model()->setData(index, yellow, Qt::ForegroundRole);
+
+//    tW->setStyleSheet("#tW row{ background-color: red; }");
+//    //tW->setStyle();
+     //tW->model()->rec
+    //model->se
     headers = "Педагог;" + classes_h + "Итого часов;Сумма;Выплата педагогу";
     ui->tW_ped->setHorizontalHeaderLabels(headers.split(";"));
 
@@ -222,10 +244,13 @@ void AddAccount::fillData()
         QSqlQueryModel *acc = myDB->Query("SELECT * FROM accounts WHERE group_id = " + gid + " AND date ='" + date + "'" + " AND child_id =" + childs->record(i).value("id").toString());
         int child_sum = 0;
 
+//        QBrush over_color;
+//        over_color.setColor(Qt::red);
+
         for(int j = 0; j < count_teachers; j++){
             model->insertRow(model->rowCount());
             int rowid = model->rowCount() - 1;
-            model->setItem(rowid,1,new QStandardItem(teachers->record(j).value("fio").toString()));
+            model->setItem(rowid,1, new QStandardItem(teachers->record(j).value("fio").toString()));
             teachers_map.insert(teachers->record(j).value("fio").toString(), teachers->record(j).value("id").toString());
             //заполняем таблицу с занятиями
             for(int z = 0; z < acc->rowCount(); z++){
@@ -240,12 +265,14 @@ void AddAccount::fillData()
                 //child_sum += teacher_sum;
                // tW->setItem(rowid,  tW->columnCount() - 3, new QTableWidgetItem(QString::number(teacher_sum)));
             }
+//            if (model->item(rowid, 2)){
+//                model->item(rowid, 2)->setBackground(over_color);
+//            }
         }
 
-        tW->setSpan(model->rowCount() - count_teachers, 0, count_teachers, 1);
-        tW->setSpan(model->rowCount() - count_teachers, model->columnCount() - 2, count_teachers, 1);
-        tW->setSpan(model->rowCount() - count_teachers, model->columnCount() - 3, count_teachers, 1);
-
+        tW->setSpanF(model->rowCount() - count_teachers, 0, count_teachers, 1);
+        tW->setSpanF(model->rowCount() - count_teachers, model->columnCount() - 2, count_teachers, 1);
+        tW->setSpanF(model->rowCount() - count_teachers, model->columnCount() - 3, count_teachers, 1);
         //итого к оплате
         model->setItem(model->rowCount() - count_teachers,  model->columnCount() - 2, new QStandardItem(QString::number(child_sum)));
         //долг
@@ -264,6 +291,7 @@ void AddAccount::fillData()
     delete child_acc_all;
     delete child_pay_all;
     calc();
+
     tW->resizeColumnsToContents();
     filled = true;
 
@@ -443,6 +471,107 @@ QString AddAccount::prepareVedomost()
     return pg;
 }
 
+QString AddAccount::prepareRashiforvka()
+{
+    QString date = ui->dateEdit->text();
+    QString pg;
+
+    pg = "<html><head><meta http-equiv='content-type' content='text/html; charset=utf-8'>   <style>      body {        width: 297mm;          height: 210mm;        padding: 15mm 15mm 15mm 25mm;         background-color: white;          font-family:  'Times New Roman';         font-size: 150px;      }      td{	font-size: 150px;      }      th{	font-size: 150px;      }        .tdc{	text-align:center;      }    </style>    </head><body>";
+    pg += "<table  border=3 cellpadding=1 cellspacing=0 width=100%>";
+    pg += "<tr><td colspan='4'>Расшифровка за " + date + "</td></tr>";
+    pg += "<tr><td colspan='4'>платных образовательных услуг</td></tr>";
+    pg += "<tr><td colspan='4'>по МДОУ \"ЦРР - дс №81\" г.Магнитогорск</td></tr>";
+    pg += "<tr><th>Наименование</th><th>Кол-во детей</th><th>Кол-во д/часов</th><th>Сумма руб.</th></tr>";
+    QString sql = "SELECT t2.fio, t1.name, sum(t0.sum) AS sum, sum(t0.hours) AS hours, count(t0.child_id) AS count_childs  FROM accounts  t0";
+           sql += " LEFT OUTER  JOIN classes  t1 ON t0.classes_id = t1.id";
+           sql += " LEFT OUTER  JOIN teachers  t2 ON t0.teacher_id = t2.id";
+           sql += " WHERE date='"+date+"'";
+           sql += " GROUP BY t0.classes_id,  t0.teacher_id  ORDER BY t0.classes_id,  t2.fio";
+    QSqlQueryModel *total_acc = myDB->Query(sql);
+    QString classe = "";
+    float sum = 0;
+    float hours = 0;
+    float count_childs = 0;
+    float tsum = 0;
+    float thours = 0;
+    float tcount_childs = 0;
+
+    for(int i = 0; i < total_acc->rowCount(); i++){
+        if (classe != total_acc->record(i).value("name").toString()){
+            classe = total_acc->record(i).value("name").toString();
+            pg.replace("##last1", QString::number(count_childs));
+            pg.replace("##last2", QString::number(hours));
+            pg.replace("##last3", QString::number(sum));
+            sum = 0;
+            hours = 0;
+            count_childs = 0;
+            pg += "<tr style='background-color: #ddd;'><td><b>" + classe +"</b></td><td><b>##last1</b></td><td><b>##last2</b></td><td><b>##last3</b></td></tr>";
+        }
+        sum += total_acc->record(i).value("sum").toFloat();
+        hours += total_acc->record(i).value("hours").toFloat();
+        count_childs += total_acc->record(i).value("count_childs").toFloat();
+
+        tsum += total_acc->record(i).value("sum").toFloat();
+        thours += total_acc->record(i).value("hours").toFloat();
+        tcount_childs += total_acc->record(i).value("count_childs").toFloat();
+
+        pg += "<tr><td>" + total_acc->record(i).value("fio").toString() +"</td>";
+        pg += "<td>" + total_acc->record(i).value("count_childs").toString() +"</td>";
+        pg += "<td>" + total_acc->record(i).value("hours").toString() +"</td>";
+        pg += "<td>" + total_acc->record(i).value("sum").toString() +"</td></tr>";
+    }
+    pg.replace("##last1", QString::number(count_childs));
+    pg.replace("##last2", QString::number(hours));
+    pg.replace("##last3", QString::number(sum));
+
+    pg += "<tr  style='background-color: #ddd;'><td><b>Итого</b></td>";
+    pg += "<td><b>" + QString::number(tcount_childs) +"</b></td>";
+    pg += "<td><b>" + QString::number(thours) +"</b></td>";
+    pg += "<td><b>" + QString::number(tsum) +"</b></td></tr>";
+
+    pg += "</table>";
+    pg += "<br>Заведующий МДОУ \"ЦРР - дс №81\" ________________ Г.Г.Безрукова";
+    return pg;
+
+}
+
+void AddAccount::to_pdf(QString fname, QString data, QPrinter::Orientation Orientation)
+{
+
+#if !defined(QT_NO_PRINTER)
+     QTextEdit textEdit;
+     textEdit.setHtml(data);
+     QPrinter printer(QPrinter::HighResolution);
+
+     printer.setOutputFormat(QPrinter::PdfFormat);
+     printer.setOutputFileName(fname+".pdf");
+
+     printer.setOrientation(Orientation);
+     printer.setPaperName("A4");
+
+     printer.setPageMargins(1, 1, 1, 1, QPrinter::Millimeter );
+     textEdit.print(&printer);
+#endif
+}
+
+void AddAccount::to_print(QString data, QPrinter::Orientation Orientation)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog *dlg = new QPrintDialog(&printer, this);
+
+   dlg->setWindowTitle(tr("Настройки принтера"));
+   if (dlg->exec() == QDialog::Accepted){
+     QTextEdit textEdit;
+     textEdit.setHtml(data);
+     QPrinter printer(QPrinter::HighResolution);
+     printer.setOrientation(Orientation);
+     printer.setPageMargins(1, 1, 1, 1, QPrinter::Millimeter );
+     printer.setPaperName("A4");
+     textEdit.print(&printer);
+   }
+   delete dlg;
+}
+
 
 
 void AddAccount::on_toolButton_fill_clicked()
@@ -488,58 +617,27 @@ void AddAccount::on_toolButton_save_clicked()
 
 void AddAccount::on_toolButton_print_clicked()
 {
-
-    #if !defined(QT_NO_PRINTER)
-         QTextEdit textEdit;
-         textEdit.setHtml(prepareVedomost());
-         QPrinter printer(QPrinter::HighResolution);
-
-         printer.setOutputFormat(QPrinter::PdfFormat);
-         QString pdfname = "v" + ui->dateEdit->text() + "_" + ui->comboBox_groups->currentText();
-         printer.setOutputFileName(""+ pdfname+".pdf");
-
-         printer.setOrientation(QPrinter::Landscape);
-         printer.setPaperName("A4");
-
-         printer.setPageMargins(1, 0.5, 1, 0.5, QPrinter::Unit() );
-         textEdit.print(&printer);
-     #endif
-
+    from_btn_print = 0;
+    ui->toolButton_print->showMenu();
 }
 
 void AddAccount::on_toolButton_clicked()
 {
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog *dlg = new QPrintDialog(&printer, this);
 
-   dlg->setWindowTitle(tr("Настройки принтера"));
-   if (dlg->exec() == QDialog::Accepted){
-     QTextEdit textEdit;
-     textEdit.setHtml(prepareVedomost());
-     QPrinter printer(QPrinter::HighResolution);
-     printer.setOrientation(QPrinter::Landscape);
-     printer.setPaperName("A4");
-     textEdit.print(&printer);
-   }
-   delete dlg;
+    from_btn_print = 1;
+    ui->toolButton->showMenu();
 }
 
 void AddAccount::on_tW_cellChanged(QStandardItem *item)
 {
-    //qDebug() << "item changed";
     if (filled)calc();
-
 }
-
-
 
 
 void AddAccount::on_teachers_toggled(bool checked)
 {
      QCheckBox *cb =  (QCheckBox*)sender();
      teachersCheckBox_map[cb->text()] = checked;
-
-     //qDebug() << cb->text().toInt();
 }
 
 void AddAccount::on_comboBox_groups_currentIndexChanged(int index)
@@ -559,4 +657,21 @@ void AddAccount::on_dateEdit_editingFinished()
     fillData();
     teachersCheckBox_map.clear();
 }
+
+void AddAccount::on_PrintMenu(QAction *act)
+{
+    if (from_btn_print == 0){
+        if (act->text() == "Ведомость")to_pdf("v" + ui->dateEdit->text() + "_" + ui->comboBox_groups->currentText(), prepareVedomost(), QPrinter::Landscape);
+        if (act->text() == "Расшифровка")to_pdf("r" + ui->dateEdit->text(), prepareRashiforvka(), QPrinter::Portrait);
+    }
+    if (from_btn_print == 1){
+        if (act->text() == "Ведомость")to_print( prepareVedomost(), QPrinter::Landscape);
+        if (act->text() == "Расшифровка")to_print(prepareRashiforvka(), QPrinter::Portrait);
+    }
+
+}
+
+
+
+
 

@@ -64,6 +64,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="checkBox_twokv">
+       <property name="text">
+        <string>2 на лист</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QCheckBox" name="checkBox_duplex">
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Если ваш принтер поддерживает печать на 2 стороны&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

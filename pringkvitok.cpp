@@ -122,21 +122,34 @@ void PringKvitok::on_toolButton_print_clicked()
        }
 
        ui->progressBar->setMaximum(count);
+       QString page1;
+       QString page2;
        while (i.hasPrevious()) {
            i.previous();
-            QCheckBox *cb = i.value();
+           QCheckBox *cb = i.value();
+
             if (cb->checkState() == Qt::Checked){
-                pg += prepareKvit(cb->text());
-                ui->progressBar->setValue(c++);
-             }
+                if (ui->checkBox_twokv->checkState() == Qt::Checked){
+                if (page1 == "") page1 = prepareKvit(cb->text());
+                else {
+                   page2 = prepareKvit(cb->text());
+                   pg += TwoKvitOnePage(page1, page2);
+                   page1 = "";
+                   page2 = "";
+                }
+             } else pg += prepareKvit(cb->text());
+             ui->progressBar->setValue(c++);
+           }
+
        }
+       if (ui->checkBox_twokv->checkState() == Qt::Checked && page1 != "" && page2 == "") pg += page1;
         QTextDocument textDocument;
 
         textDocument.setHtml(pg);
          QPrinter printer(QPrinter::HighResolution);
          printer.setOrientation(QPrinter::Portrait);
          printer.setPaperName("A4");
-         printer.setPageMargins(1, 0.5, 1, 0.5, QPrinter::Unit() );
+         printer.setPageMargins(0.3, 0.3, 0.3, 0.3, QPrinter::Unit() );
          if (ui->checkBox_duplex->checkState() == Qt::Checked)printer.setDuplex(QPrinter::DuplexAuto);
          textDocument.print(&printer);
           ui->progressBar->setVisible(false);
@@ -147,6 +160,12 @@ void PringKvitok::on_toolButton_print_clicked()
 
 QString PringKvitok::prepareKvit(QString child_id)
 {
+
+    QSqlQueryModel *child = myDB->Query("SELECT * FROM childs WHERE id="+child_id);
+    QString ls = child->record(0).value("ls").toString();
+    QString fio = child->record(0).value("fio").toString();
+    delete child;
+
     QSqlQueryModel *kvitok = myDB->Query("SELECT value FROM sys_config WHERE name='kvitok'");
     QString teml = kvitok->record(0).value("value").toString();
     QString pg;
@@ -155,22 +174,22 @@ QString PringKvitok::prepareKvit(QString child_id)
 
 
     float pay = 0;
-    QString ls;
-    QString fio;
+
     QString sql = "SELECT sum(sum) AS sum  FROM pay WHERE child_id="+child_id;
     QSqlQueryModel *child_pay_all = myDB->Query(sql);
     for(int j = 0; j < child_pay_all->rowCount(); j++){
         pay = child_pay_all->record(j).value("sum").toFloat();
     }
 
+    //начисления за текущий месяц
     sql = "SELECT t0.classes_id, sum(t0.sum) AS sum FROM accounts t0";
     sql += " WHERE t0.date ='"+ui->dateEdit->text()+"' AND t0.child_id=" + child_id;
     sql += " GROUP BY  t0.classes_id";
     QSqlQueryModel *child_acc_cur = myDB->Query(sql);
 
-    sql = "SELECT t0.classes_id, t1.name AS classes, sum(t0.sum) AS sum,  t2.ls, t2.fio  FROM accounts t0";
+    //все начисления
+    sql = "SELECT t0.classes_id, t1.name AS classes, sum(t0.sum) AS sum FROM accounts t0";
     sql += " LEFT JOIN classes t1 ON t0.classes_id = t1.id";
-    sql += " LEFT JOIN childs  t2 ON t0.child_id = t2.id";
     sql += " WHERE t0.date <='"+ui->dateEdit->text()+"' AND t0.child_id=" + child_id;
     sql += " GROUP BY t0.classes_id";
     QSqlQueryModel *child_acc_all = myDB->Query(sql);
@@ -181,15 +200,20 @@ QString PringKvitok::prepareKvit(QString child_id)
     float sumall = 0;
     float sumcur = 0;
 
+    float suma = 0;
+    float sumc = 0;
+
     for(int i = 0; i < child_acc_all->rowCount(); i++){
         all[child_acc_all->record(i).value("classes_id").toInt()] = child_acc_all->record(i).value("sum").toFloat();
-        ls = child_acc_all->record(i).value("ls").toString();
-        fio = child_acc_all->record(i).value("fio").toString();
+//        ls = child_acc_all->record(i).value("ls").toString();
+ //       fio = child_acc_all->record(i).value("fio").toString();
+        suma += child_acc_all->record(i).value("sum").toFloat();
     }
     for(int i = 0; i < child_acc_cur->rowCount(); i++){
         int id = child_acc_cur->record(i).value("classes_id").toInt();
         cur[id] = child_acc_cur->record(i).value("sum").toFloat();
         all[id] -= cur[id];
+        sumc += child_acc_cur->record(i).value("sum").toFloat();
         //sumall += all[id];
     }
 
@@ -199,26 +223,29 @@ QString PringKvitok::prepareKvit(QString child_id)
         i.next();
         sumall += i.value();
     }
+
     float op = pay;
-    while (i.hasPrevious()) {
-         i.previous();
-         float percet = i.value() / sumall;
-         int m = floor(pay * percet);
-         if (i.value() < m) m = i.value();
-         op -= m;
-         minus[i.key()] = m;
-     }
-    QMapIterator<int, float> j(minus);
-    while (j.hasNext()) {
-        j.next();
-        all[j.key()] -= j.value();
-        if (all[j.key()] >= op && op > 0){
-            all[j.key()] -= op;
-            op = 0;
+    if( child_acc_all->rowCount() != child_acc_cur->rowCount() && suma != sumc ){
+        //qDebug() << "CALC";
+        while (i.hasPrevious()) {
+             i.previous();
+             float percet = i.value() / sumall;
+             int m = floor(pay * percet);
+             if (i.value() < m) m = i.value();
+             op -= m;
+             minus[i.key()] = m;
+         }
+        QMapIterator<int, float> j(minus);
+        while (j.hasNext()) {
+            j.next();
+            all[j.key()] -= j.value();
+            if (all[j.key()] >= op && op > 0){
+                all[j.key()] -= op;
+                op = 0;
+            }
         }
     }
 
-     //qDebug()  << op;
 
     tmp = "ФИО " + fio +" Переплата предыдущего периода: " + QString::number( op );
     tmp += "<table border=3 cellpadding=1 cellspacing=0 class='classes'>";
@@ -245,7 +272,7 @@ QString PringKvitok::prepareKvit(QString child_id)
      tmp += "</tr>";
      tmp += "</table>МДОУ «Детский сад №81»";
 
-     tmp = "<table border=0  style='page-break-after:always;'><tr><td><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br></td><td>"+  tmp +"</td></tr><tr><td></td><td>"+  tmp +"  </td></tr></table>";
+     tmp = "<!--space--><table border=0  style='page-break-after:always;'><tr><td><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br></td><td>"+  tmp +"</td></tr><tr><td></td><td>"+  tmp +"  </td></tr></table>";
 
      pg = tmp;
      float topay = sumall - op;
@@ -260,7 +287,30 @@ QString PringKvitok::prepareKvit(QString child_id)
 
     delete child_pay_all;
     delete child_acc_cur;
-    return pg;
+            return pg;
+}
+
+QString PringKvitok::TwoKvitOnePage(QString page1, QString page2)
+{
+    QString page = "<table border=0  width=100% style='page-break-after:always;'><tr><td>##one</td></tr><tr><td>##two</td></tr></table>";
+     page += "<table border=0  width=100% style='page-break-after:always;'><tr><td>##bone</td></tr><tr><td><br><br><br><br><br><hr>&nbsp;</td></tr><tr><td>##btwo</td></tr></table>";
+    page1.replace("page-break-after:always;", " ");
+    page2.replace("page-break-after:always;", " ");
+    QStringList pg1 = page1.split(QString("<!--space-->"));
+    QStringList pg2 = page2.split(QString("<!--space-->"));
+    if (pg1.count() > 1){
+       // qDebug() << "one";
+          page.replace("##one" , pg1[0]);
+          page.replace("##bone" , pg1[1]);
+    }
+    if (pg2.count() > 1){
+      //  qDebug() << "two";
+            page.replace("##two" , pg2[0]);
+            page.replace("##btwo" , pg2[1]);
+    }
+
+   // qDebug() << page;
+    return page;
 }
 
 void PringKvitok::on_toolButton_pdf_clicked()
@@ -282,14 +332,27 @@ void PringKvitok::on_toolButton_pdf_clicked()
     }
 
     ui->progressBar->setMaximum(count);
+    QString page1;
+    QString page2;
     while (i.hasPrevious()) {
         i.previous();
-         QCheckBox *cb = i.value();
+        QCheckBox *cb = i.value();
+
          if (cb->checkState() == Qt::Checked){
-             pg += prepareKvit(cb->text());
-             ui->progressBar->setValue(c++);
-          }
+             if (ui->checkBox_twokv->checkState() == Qt::Checked){
+             if (page1 == "") page1 = prepareKvit(cb->text());
+             else {
+                page2 = prepareKvit(cb->text());
+                pg += TwoKvitOnePage(page1, page2);
+                page1 = "";
+                page2 = "";
+             }
+          } else pg += prepareKvit(cb->text());
+          ui->progressBar->setValue(c++);
+        }
+
     }
+    if (ui->checkBox_twokv->checkState() == Qt::Checked && page1 != "" && page2 == "") pg += page1;
      QTextDocument textDocument;
 
      textDocument.setHtml(pg);
@@ -301,7 +364,8 @@ void PringKvitok::on_toolButton_pdf_clicked()
      printer.setOrientation(QPrinter::Portrait);
      printer.setPaperName("A4");
 
-     printer.setPageMargins(1, 0.5, 1, 0.5, QPrinter::Unit() );
+
+     printer.setPageMargins(1, 1, 1, 1,  QPrinter::Millimeter );
      textDocument.print(&printer);
      ui->progressBar->setValue(c++);
      ui->progressBar->setVisible(false);

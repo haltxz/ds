@@ -49,6 +49,7 @@ class FreezeTableWidget : public QTableView {
 public:
       FreezeTableWidget(QAbstractItemModel *model);
       ~FreezeTableWidget();
+      void setSpanF(int row, int column, int rowSpan, int columnSpan);
 
 protected:
       virtual void resizeEvent(QResizeEvent *event) Q_DECL_OVERRIDE;

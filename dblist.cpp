@@ -35,8 +35,12 @@ void dblist::setModel(QSqlRelationalTableModel *model, QString name, QString cap
     ui->tableView->resizeColumnsToContents();
     if (type == "doc")ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
+    ui->tableView->setAlternatingRowColors(true);
 
-    if (name == "childs")  ui->tableView->setItemDelegate(new QSqlRelationalDelegate( ui->tableView));
+    if (name == "childs")  {
+        ui->tableView->setItemDelegate(new QSqlRelationalDelegate( ui->tableView));
+        ui->tableView->setColumnHidden(7, true);
+   }
     if (name == "teachers")  ui->tableView->setItemDelegate(new QSqlRelationalDelegate( ui->tableView));
     if (name == "accounts")  ui->tableView->setItemDelegate(new QSqlRelationalDelegate( ui->tableView));
     if (name == "pay")  ui->tableView->setItemDelegate(new QSqlRelationalDelegate( ui->tableView));
@@ -55,6 +59,7 @@ void dblist::on_toolButton_addRow_clicked()
 void dblist::on_toolButton_refresh_clicked()
 {
     model->select();
+    ui->tableView->resizeColumnsToContents();
 }
 
 void dblist::on_toolButton_delRow_clicked()
@@ -62,6 +67,7 @@ void dblist::on_toolButton_delRow_clicked()
    ui->tableView->model()->removeRow(ui->tableView->currentIndex().row());
    model->submitAll();
    model->select();
+   ui->tableView->resizeColumnsToContents();
 }
 
 
@@ -80,6 +86,7 @@ void dblist::on_toolButton_save_clicked()
         }
     }
     model->submitAll();
+    ui->tableView->resizeColumnsToContents();
 }
 
 void dblist::on_toolButton_edit_clicked()

@@ -7,6 +7,7 @@
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QStandardItemModel>
+#include <QPrinter>
 
 namespace Ui {
 class AddAccount;
@@ -24,6 +25,9 @@ public:
     void calc();
     QString prepareVedomost();
     QString prepareKvit(QString child_id);
+    QString prepareRashiforvka();
+    void to_pdf(QString fname, QString data, QPrinter::Orientation Orientation);
+    void to_print(QString data, QPrinter::Orientation Orientation);
 
 private slots:
     void on_toolButton_fill_clicked();
@@ -43,6 +47,7 @@ private slots:
     void on_dateEdit_timeChanged(const QTime &time);
 
     void on_dateEdit_editingFinished();
+    void on_PrintMenu(QAction* act);
 
 
 private:
@@ -62,6 +67,9 @@ private:
     bool filled;
     FreezeTableWidget *tW;
     QStandardItemModel *model;
+    QMenu* m_pmnu;
+    int from_btn_print;
+
 };
 
 #endif // ADDACCOUNT_H
